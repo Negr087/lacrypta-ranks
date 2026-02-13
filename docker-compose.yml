@@ -1,0 +1,9 @@
+services:
+  app:
+    build: "https://github.com/lacrypta/bot-ranks.git"
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: "file:/data/dev.db"
+    volumes:
+      - ./data:/data

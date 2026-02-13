@@ -1,0 +1,40 @@
+{
+  "name": "bot-la-crypta-rangos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "format": "prettier --write \"**/*.{ts,tsx,md,mdx}\"",
+    "build": "tsc",
+    "dev": "nodemon --exec \"node -r esbuild-register ./src/index.ts\" -e .ts",
+    "//": "prisma commnads",
+    "prisma-generate": "prisma generate",
+    "prisma-reset": "prisma migrate reset",
+    "prisma-migrate": "prisma migrate dev --name init",
+    "prisma-studio": "prisma studio"
+  },
+  "prettier": "@lacrypta/prettier-config",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/builders": "^1.8.1",
+    "@prisma/client": "5.14.0",
+    "@types/fs-extra": "^11.0.4",
+    "discord.js": "^14.15.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@lacrypta/eslint-config": "^1.0.0",
+    "@lacrypta/prettier-config": "^1.0.0",
+    "@lacrypta/typescript-config": "^1.0.0",
+    "@types/node": "^20.12.12",
+    "esbuild": "^0.21.3",
+    "esbuild-register": "^3.5.0",
+    "nodemon": "^3.1.0",
+    "prettier": "^3.2.5",
+    "prisma": "^5.14.0",
+    "typescript": "^5.3.3"
+  }
+}

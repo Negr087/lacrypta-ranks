@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// model User {
+//   id    Int     @id @default(autoincrement())
+//   email String  @unique
+//   name  String?
+
+//   posts Post[]
+// }
+
+// model Post {
+//   id        Int     @id @default(autoincrement())
+//   title     String
+//   content   String?
+//   published Boolean @default(false)
+//   authorId  Int
+
+//   author User @relation(fields: [authorId], references: [id])
+// }
+
+/// Server models ///
+model Guild {
+  id                  String  @id @default(uuid())
+  discordGuildId      String  @unique @map("discord_guild_id")
+  levelsChannelId     String? @map("levels_channel_id")
+  padrinoMeritoRoleId String? @map("padrino_merito_role_id")
+
+  channels Channel[]
+  Role     Role[]
+  Member   Member[]
+
+  @@map("guild")
+}
+
+model Channel {
+  id               String @id @default(uuid())
+  guildId          String @map("guild_id")
+  discordChannelId String @unique @map("discord_channel_id")
+
+  guild    Guild     @relation(fields: [guildId], references: [id])
+  messages Message[]
+
+  @@map("channel")
+}
+
+model Message {
+  id                 String  @id @default(uuid())
+  channelId          String  @map("channel_id")
+  discordMessageId   String  @unique @map("discord_message_id")
+  discordCommandName String? @map("discord_command_name")
+
+  channel               Channel               @relation(fields: [channelId], references: [id])
+  messageReactionsRoles MessageReactionRole[]
+
+  @@map("message")
+}
+
+model Role {
+  id              String @id @default(uuid())
+  guildId         String @map("guild_id")
+  discordRoleId   String @unique @map("discord_role_id")
+  discordRoleName String @map("discord_role_name")
+
+  guild               Guild                 @relation(fields: [guildId], references: [id])
+  MessageReactionRole MessageReactionRole[]
+  ReactionButton      ReactionButton[]
+
+  @@map("role")
+}
+
+model MessageReactionRole {
+  id             String  @id @default(uuid())
+  messageId      String  @map("message_id")
+  roleId         String  @map("discord_role_id")
+  discordEmojiId String? @map("discord_emoji_id")
+
+  message Message @relation(fields: [messageId], references: [id])
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  @@map("message_reaction_role")
+}
+
+model ReactionButton {
+  id              String @id @default(uuid())
+  roleId          String @map("role_id")
+  discordButtonId String @map("discord_button_id")
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@map("reaction_button")
+}
+
+/// Members models ///
+model Member {
+  // Basic
+  id                           String  @id @default(uuid())
+  guildId                      String  @map("guild_id")
+  discordMemeberId             String  @unique @map("discord_user_id")
+  discordDisplayName           String  @map("discord_display_name")
+  discordProfilePicture        String  @map("discord_avatar")
+  // Level 
+  discordTemporalLevelXp       Int     @map("discord_temporal_level_xp")
+  discordTemporalLevel         Int     @map("discord_temporal_level")
+  discordTemporalLevelCooldown String  @map("discord_temporal_level_cooldown")
+  // Padrino
+  myPadrinoId                  String? @map("my_padrino_id")
+
+  guild          Guild    @relation(fields: [guildId], references: [id])
+  padrinoProfile Padrino? @relation(fields: [myPadrinoId], references: [id])
+
+  @@index([discordTemporalLevel(sort: Desc), discordTemporalLevelXp(sort: Desc)])
+  @@map("member")
+}
+
+model Padrino {
+  id               String @id @default(uuid())
+  memberId         String @unique @map("member_id")
+  shortDescription String @map("short_description")
+  longDescription  String @map("long_description")
+
+  Member Member[]
+
+  @@map("padrino")
+}
