@@ -7,6 +7,7 @@
     "postinstall": "prisma generate",
     "format": "prettier --write \"**/*.{ts,tsx,md,mdx}\"",
     "build": "tsc",
+    "start": "node dist/index.js",
     "dev": "nodemon --exec \"node -r esbuild-register ./src/index.ts\" -e .ts",
     "//": "prisma commnads",
     "prisma-generate": "prisma generate",
