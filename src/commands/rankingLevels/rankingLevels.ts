@@ -10,23 +10,16 @@ const rankingLevels: Command = {
     .setName('ranking-niveles')
     .setDescription('Ver el ranking de niveles.') as SlashCommandBuilder,
   execute: async (_discordInteraction: CommandInteraction) => {
+    await _discordInteraction.deferReply(); // <-- agregado
     const updateLevelSatus: boolean = await cacheService.updateMembersLevelsToDatabase();
-
     const topTen: PrismaMember[] | null = await cacheService.getMembersRankingTopTen(_discordInteraction.guild?.id!);
-
     if (!topTen) return;
-
     const rankingEmbed = new EmbedBuilder().setColor(0x0099ff);
-
-    // let data: string = '';
     topTen.forEach((member: PrismaMember, index: number) => {
       if (member.discordTemporalLevelXp === 0) {
         if (index === 0) rankingEmbed.setDescription('Nadie ganó experiencia.');
-
         return;
       }
-
-      // Data in rankingEmbed
       switch (index) {
         case 0:
           rankingEmbed.addFields({
@@ -57,27 +50,9 @@ const rankingLevels: Command = {
           });
           break;
       }
-
-      // Data in string
-      // switch (index) {
-      //   case 0:
-      //     data += `# :trophy: **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-      //     break;
-      //   case 1:
-      //     data += `## :second_place: **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-      //     break;
-      //   case 2:
-      //     data += `### :third_place: **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-      //     break;
-      //   default:
-      //     data += `#${index + 1} **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-      //     break;
-      // }
     });
-
-    // Send rankingEmbed message
     try {
-      await _discordInteraction.reply({
+      await _discordInteraction.editReply({ // <-- cambiado de reply a editReply
         content: '# Ranking de niveles\n',
         embeds: [rankingEmbed],
       });
@@ -86,5 +61,4 @@ const rankingLevels: Command = {
     }
   },
 };
-
 export default rankingLevels;
