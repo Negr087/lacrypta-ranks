@@ -1,12 +1,27 @@
-FROM node:20.13.1-alpine
+FROM node:20-alpine
 
-RUN mkdir -p /usr/src/bot
+RUN npm install -g pnpm
+
 WORKDIR /usr/src/bot
 
-COPY package.json pnpm-lock.yaml prisma ./
+COPY package.json pnpm-lock.yaml ./
 
-RUN npm install -g pnpm && pnpm install
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-CMD ["pnpm", "dev"]
+RUN pnpm exec prisma generate
+
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node -r esbuild-register ./src/index.ts"]
+```
+
+El único cambio es la última línea — ahora antes de arrancar el bot corre `prisma migrate deploy` para asegurarse que la base de datos esté sincronizada.
+
+---
+
+También asegurate de que tu `.dockerignore` tenga esto:
+```
+node_modules
+.env
+dist
+*.log
