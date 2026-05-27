@@ -8,19 +8,18 @@ const rankingLevels = {
         .setName('ranking-niveles')
         .setDescription('Ver el ranking de niveles.'),
     execute: async (_discordInteraction) => {
+        await _discordInteraction.deferReply(); // <-- agregado
         const updateLevelSatus = await cache_1.cacheService.updateMembersLevelsToDatabase();
         const topTen = await cache_1.cacheService.getMembersRankingTopTen(_discordInteraction.guild?.id);
         if (!topTen)
             return;
         const rankingEmbed = new builders_1.EmbedBuilder().setColor(0x0099ff);
-        // let data: string = '';
         topTen.forEach((member, index) => {
             if (member.discordTemporalLevelXp === 0) {
                 if (index === 0)
                     rankingEmbed.setDescription('Nadie ganó experiencia.');
                 return;
             }
-            // Data in rankingEmbed
             switch (index) {
                 case 0:
                     rankingEmbed.addFields({
@@ -51,25 +50,9 @@ const rankingLevels = {
                     });
                     break;
             }
-            // Data in string
-            // switch (index) {
-            //   case 0:
-            //     data += `# :trophy: **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-            //     break;
-            //   case 1:
-            //     data += `## :second_place: **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-            //     break;
-            //   case 2:
-            //     data += `### :third_place: **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-            //     break;
-            //   default:
-            //     data += `#${index + 1} **<@${member.discordMemeberId}>**\n> *Nivel:* ${member.discordTemporalLevel} - *XP:* ${member.discordTemporalLevelXp}\n`;
-            //     break;
-            // }
         });
-        // Send rankingEmbed message
         try {
-            await _discordInteraction.reply({
+            await _discordInteraction.editReply({
                 content: '# Ranking de niveles\n',
                 embeds: [rankingEmbed],
             });

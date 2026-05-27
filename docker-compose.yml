@@ -1,6 +1,6 @@
 services:
   app:
-    build: "https://github.com/lacrypta/bot-ranks.git"
+    build: .
     env_file:
       - ./.env
     environment:
