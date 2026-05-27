@@ -2,6 +2,7 @@ import { GuildTextBasedChannel, Message } from 'discord.js';
 import { BotEvent } from '../types/botEvents';
 import { LevelUpStatus, addXpMessage } from '../services/temporalLevel';
 import { prisma } from '../services/prismaClient';
+import { cacheService } from '../services/cache';
 
 const event: BotEvent = {
   name: 'messageCreate',
@@ -16,6 +17,10 @@ const event: BotEvent = {
 
     console.log(`👤 Mensaje recibido de: ${message.author.username}`);
     console.log(`📝 Contenido: ${message.content}`);
+
+    // Guardamos el top 3 ANTES de sumar XP
+    const topAntes = await cacheService.getMembersRankingTopTen(message.guild!.id);
+    const top3Antes = topAntes?.slice(0, 3).map((m) => m.discordMemeberId) ?? [];
 
     const levelUpStatus = await addXpMessage(message);
 
@@ -47,6 +52,23 @@ const event: BotEvent = {
       } else {
         console.log('📈 XP sumado pero no sube de nivel todavía');
       }
+
+      // Consultamos el top 3 DESPUÉS de sumar XP
+      const topDespues = await cacheService.getMembersRankingTopTen(message.guild!.id);
+      const top3Despues = topDespues?.slice(0, 3).map((m) => m.discordMemeberId) ?? [];
+
+      // Comparamos si hubo cambios en el top 3
+      const huboCambios = top3Despues.some((id, index) => id !== top3Antes[index]);
+
+      if (huboCambios && top3Despues.length >= 1) {
+        console.log('🏆 Cambio en el top 3!');
+        const medals = ['🥇', '🥈', '🥉'];
+        const lines = top3Despues.map((id, i) => `${medals[i]} <@${id}>`).join('\n');
+        await discordChannel.send(
+          `🏆 **¡Hubo cambios en el Top 3!**\n${lines}`,
+        );
+      }
+
     } else {
       console.log('❌ addXpMessage devolvió undefined');
     }
