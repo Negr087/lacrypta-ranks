@@ -79,7 +79,7 @@ function esSpamSinVocales(content: string): boolean {
   const ratioVocales = vocales / soloLetras.length;
 
   // Si tiene menos del 15% de vocales, es spam
-  return ratioVocales < 0.15;
+  return ratioVocales < 0.25;
 }
 
 function canLevelUp(member: PrismaMember, xpToAdd: number) {
