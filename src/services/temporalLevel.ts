@@ -3,6 +3,7 @@ import { Guild, GuildMember, Message, MessageReaction, User } from 'discord.js';
 import { cacheService } from './cache';
 
 const COLDOWN_MS = 90 * 1000;
+const SPAM_PENALTY_XP = 25;
 
 /// Levels
 interface Level {
@@ -45,7 +46,18 @@ export interface LevelUpStatus {
   canLevelUp: boolean;
   level: number;
   xpRemaining: number;
+  wasSpam?: boolean;
 }
+
+// Exportamos las constantes para que el comando /xpinfo las pueda leer
+export const xpConfig = {
+  COLDOWN_MS,
+  SPAM_PENALTY_XP,
+  XP_MESSAGE: XpTypes.MESSAGE,
+  XP_REACTION_RECEIVE: XpTypes.REACTION_RECEIVE,
+  XP_REACTION_SEND: XpTypes.REACTION_SEND,
+  levels,
+};
 
 // Set to avoid processing the same reaction twice
 const processedReactions = new Set<string>();
@@ -54,11 +66,25 @@ function generateReactionKey(reaction: MessageReaction, userId: string): string 
   return `${reaction.message.id}-${reaction.emoji.name}-${userId}`;
 }
 
+// 🚫 Detecta texto sin vocales (asdbaks, qwerty, hjkl, etc)
+function esSpamSinVocales(content: string): boolean {
+  // Limpiamos: solo letras, sin números, espacios ni símbolos
+  const soloLetras = content.toLowerCase().replace(/[^a-záéíóúñ]/g, '');
+
+  // Si el mensaje limpio tiene 5 o menos letras, no lo consideramos spam (ok, si, no, etc)
+  if (soloLetras.length <= 5) return false;
+
+  // Contar vocales
+  const vocales = soloLetras.match(/[aeiouáéíóú]/g)?.length ?? 0;
+  const ratioVocales = vocales / soloLetras.length;
+
+  // Si tiene menos del 15% de vocales, es spam
+  return ratioVocales < 0.15;
+}
+
 function canLevelUp(member: PrismaMember, xpToAdd: number) {
   const nextLevelXp: number = levels[(member.discordTemporalLevel + 1).toString()]!;
 
-  // canLevelUp === true, return the remaining xp after level up. (you must asign LevelUpStatus.xpRemaining to member.discordTemporalLevelXp)
-  // canLevelUp === false, return the xp to add. (you must add LevelUpStatus.xpRemaining to member.discordTemporalLevelXp)
   const newXp: number = member.discordTemporalLevelXp + xpToAdd;
   return {
     canLevelUp: newXp >= nextLevelXp,
@@ -68,13 +94,27 @@ function canLevelUp(member: PrismaMember, xpToAdd: number) {
 }
 
 function amountXpToAddMessage(_message: Message, _prismaMember: PrismaMember) {
+  // 🚫 Si es spam, restamos XP en lugar de sumar
+  if (esSpamSinVocales(_message.content)) {
+    const xpActual = _prismaMember.discordTemporalLevelXp;
+    const nuevoXp = Math.max(0, xpActual - SPAM_PENALTY_XP); // no permitimos XP negativo
+    const xpQuedaEnPosicion = nuevoXp; // este es el XP final, no un incremento
+
+    return {
+      canLevelUp: false,
+      level: _prismaMember.discordTemporalLevel,
+      xpRemaining: -SPAM_PENALTY_XP, // negativo para indicar resta
+      wasSpam: true,
+    } as LevelUpStatus;
+  }
+
   const messageLength: number = _message.content.length;
   const newTimestamp: number = _message.createdTimestamp;
   const lastTimestamp: string = _prismaMember.discordTemporalLevelCooldown;
 
   const xpType: number = XpTypes.MESSAGE;
   const deltaTime: number = newTimestamp - parseInt(lastTimestamp);
-  const lengthMultiplier: number = (Math.random() * messageLength) % 1; // TODO
+  const lengthMultiplier: number = (Math.random() * messageLength) % 1;
 
   const amountXpToAdd = Math.floor(xpType * Math.min(1, deltaTime / COLDOWN_MS) + xpType * lengthMultiplier);
 
@@ -99,7 +139,6 @@ async function amountXpToAddReaction(
 
     const levelUpStatusMessageAuthor: LevelUpStatus = canLevelUp(_messageAuthor, XpTypes.REACTION_RECEIVE);
 
-    /// Reaction Author
     if (!_reactionAuthor) {
       throw new Error('Reaction author not found');
     }
@@ -110,7 +149,7 @@ async function amountXpToAddReaction(
     const xpType: number = XpTypes.REACTION_SEND;
     const deltaTime: number = newTimestamp - parseInt(lastTimestamp);
 
-    const amountXpToAdd = Math.floor(xpType * Math.min(1, deltaTime / COLDOWN_MS)); // TODO
+    const amountXpToAdd = Math.floor(xpType * Math.min(1, deltaTime / COLDOWN_MS));
 
     const levelUpStatusReactionAuthor: LevelUpStatus = canLevelUp(_reactionAuthor, amountXpToAdd);
 
@@ -130,25 +169,38 @@ async function addXpMessage(_message: Message) {
       _message.author.id,
     );
 
-    // 🔥 Si no existe, lo creamos correctamente
     if (!member) {
-  console.log('👤 Miembro no encontrado en DB, creando automáticamente...');
+      console.log('👤 Miembro no encontrado en DB, creando automáticamente...');
+      member = await cacheService.upsertMember(
+        _message.guild!.id,
+        _message.author.id,
+        _message.member?.displayName || _message.author.username,
+        _message.author.displayAvatarURL(),
+      );
+    }
 
-  member = await cacheService.upsertMember(
-    _message.guild!.id,
-    _message.author.id,
-    _message.member?.displayName || _message.author.username,
-    _message.author.displayAvatarURL(),
-  );
-}
+    if (!member) {
+      console.log('❌ No se pudo crear el miembro');
+      return null;
+    }
 
-if (!member) {
-  console.log('❌ No se pudo crear el miembro');
-  return null;
-}
-
-    // 🔥 Ahora member NUNCA es null
     const levelUpStatus: LevelUpStatus = amountXpToAddMessage(_message, member);
+
+    // 🚫 Si fue detectado como spam, restamos XP
+    if (levelUpStatus.wasSpam) {
+      const xpActual = member.discordTemporalLevelXp;
+      const nuevoXp = Math.max(0, xpActual - SPAM_PENALTY_XP);
+      const xpARestar = xpActual - nuevoXp; // cuánto realmente se resta
+
+      // Actualizamos directamente con el XP restado
+      await cacheService.incrementMemberXp(
+        member,
+        -xpARestar, // resta
+        _message.createdTimestamp.toString(),
+      );
+
+      return levelUpStatus;
+    }
 
     if (levelUpStatus.canLevelUp) {
       await cacheService.levelUpMember(
