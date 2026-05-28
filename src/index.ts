@@ -2,15 +2,12 @@ import { Client, GatewayIntentBits, Collection } from 'discord.js';
 import { ExtendedClient } from './types/discordClient';
 import { readdirSync } from 'fs';
 import { join } from 'path';
-
 import { BotEvent } from './types/botEvents';
 import { commandsList } from './deployCommands';
 import { Command } from './types/command';
-
+import { iniciarScheduler } from './services/scheduler';
 require('dotenv').config();
-
 console.info('Hello World');
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -20,10 +17,8 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
   ],
 }) as ExtendedClient;
-
 const eventsPath = join(__dirname, 'events');
 const eventFiles = readdirSync(eventsPath);
-
 for (const file of eventFiles) {
   const filePath = join(eventsPath, file);
   const event: BotEvent = require(filePath).default;
@@ -35,12 +30,15 @@ for (const file of eventFiles) {
     console.info(`Event ${event.name} loaded.`);
   }
 }
-
 client.login(process.env.DISCORD_BOT_TOKEN);
-
 /// Commands ///
 // Load commands in client instance
 client.commands = new Collection();
 commandsList.forEach((command: Command) => {
   client.commands.set(command.data.name, command);
+});
+
+// 🕐 Iniciar el scheduler cuando el bot esté listo
+client.once('ready', () => {
+  iniciarScheduler(client);
 });
