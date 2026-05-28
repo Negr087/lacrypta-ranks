@@ -1,7 +1,7 @@
 import { CommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { Command } from '../../types/command';
-import { cacheService } from '../../services/cache';
 import { prisma } from '../../services/prismaClient';
+import { sumXpLevel } from '../../services/temporalLevel';
 
 const levelsXp: { [key: string]: number } = {
   '1': 100, '2': 1000, '3': 3000, '4': 4000, '5': 5000,
@@ -14,7 +14,7 @@ const levelsXp: { [key: string]: number } = {
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName('milugar')
-    .setDescription('Muestra tu posición en el ranking quincenal'),
+    .setDescription('Muestra tu posicion en el ranking quincenal'),
   execute: async (interaction: CommandInteraction) => {
     try {
       if (!interaction.guild) {
@@ -22,12 +22,11 @@ const command: Command = {
         return;
       }
 
-      // Traer TODOS los miembros del guild ordenados
       const guild = await prisma.guild.findUnique({
         where: { discordGuildId: interaction.guild.id },
       });
       if (!guild) {
-        await interaction.reply({ content: 'No se encontró el servidor en la base de datos.', ephemeral: true });
+        await interaction.reply({ content: 'No se encontro el servidor en la base de datos.', ephemeral: true });
         return;
       }
 
@@ -43,7 +42,7 @@ const command: Command = {
 
       if (posicion === -1) {
         await interaction.reply({
-          content: '📊 Todavía no estás en el ranking. ¡Empezá a participar para sumar XP!',
+          content: 'Todavia no estas en el ranking. Empeza a participar para sumar XP!',
           ephemeral: true,
         });
         return;
@@ -55,31 +54,37 @@ const command: Command = {
         ? siguienteNivelXp - miMember.discordTemporalLevelXp
         : null;
 
-      // Diferencia con quien está arriba
+      // Diferencia con quien esta arriba (siempre en XP, no importa el nivel)
       let mensajeArriba = '';
       if (posicion > 0) {
         const arriba = todos[posicion - 1]!;
+
+        // Calculamos XP TOTAL acumulado de cada uno
+        // = XP de todos los niveles completados + XP actual en el nivel
+        const miXpTotal = sumXpLevel(miMember.discordTemporalLevel) + miMember.discordTemporalLevelXp;
+        const xpTotalArriba = sumXpLevel(arriba.discordTemporalLevel) + arriba.discordTemporalLevelXp;
+        const diff = xpTotalArriba - miXpTotal;
+
         if (arriba.discordTemporalLevel === miMember.discordTemporalLevel) {
-          const diff = arriba.discordTemporalLevelXp - miMember.discordTemporalLevelXp;
           mensajeArriba = `\n🎯 Te faltan **${diff} XP** para alcanzar a <@${arriba.discordMemeberId}>`;
         } else {
-          mensajeArriba = `\n🎯 <@${arriba.discordMemeberId}> está arriba tuyo (Nivel ${arriba.discordTemporalLevel})`;
+          mensajeArriba = `\n🎯 Te faltan **${diff} XP** para alcanzar a <@${arriba.discordMemeberId}> (Nivel ${arriba.discordTemporalLevel})`;
         }
       } else {
-        mensajeArriba = `\n👑 ¡Estás en el **primer puesto**!`;
+        mensajeArriba = `\n👑 Estas en el **primer puesto**!`;
       }
 
       const totalParticipantes = todos.length;
 
       let mensaje = `📊 **Tu lugar en el ranking**\n\n`;
-      mensaje += `🏅 Posición: **#${posicion + 1}** de ${totalParticipantes}\n`;
+      mensaje += `🏅 Posicion: **#${posicion + 1}** de ${totalParticipantes}\n`;
       mensaje += `⭐ Nivel actual: **${miMember.discordTemporalLevel}**\n`;
       mensaje += `✨ XP acumulado: **${miMember.discordTemporalLevelXp}**\n`;
 
       if (xpParaSiguienteNivel !== null) {
         mensaje += `📈 Te faltan **${xpParaSiguienteNivel} XP** para el nivel ${miMember.discordTemporalLevel + 1}\n`;
       } else {
-        mensaje += `🌟 ¡Llegaste al nivel máximo!\n`;
+        mensaje += `🌟 Llegaste al nivel maximo!\n`;
       }
 
       mensaje += mensajeArriba;
