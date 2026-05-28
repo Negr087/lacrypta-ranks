@@ -18,7 +18,7 @@ const event: BotEvent = {
     console.log(`👤 Mensaje recibido de: ${message.author.username}`);
     console.log(`📝 Contenido: ${message.content}`);
 
-    // Guardamos el top 3 ANTES de sumar XP
+    // Top 3 antes de sumar XP
     const topAntes = await cacheService.getMembersRankingTopTen(message.guild!.id);
     const top3Antes = topAntes?.slice(0, 3).map((m) => m.discordMemeberId) ?? [];
 
@@ -27,22 +27,26 @@ const event: BotEvent = {
     console.log('⚡ Resultado addXpMessage:', levelUpStatus);
 
     if (levelUpStatus) {
-      console.log('📊 LevelUpStatus detectado');
-
       const levelsChannelId: string | null | undefined = await prisma.guild
         .findUnique({
-          where: {
-            discordGuildId: message.guild?.id,
-          },
+          where: { discordGuildId: message.guild?.id },
         })
         .then((guild) => guild?.levelsChannelId);
-
-      console.log('📡 Canal configurado en DB:', levelsChannelId);
 
       const discordChannel: GuildTextBasedChannel | undefined =
         message.guild?.channels.cache.get(
           levelsChannelId || message.channel.id,
         ) as GuildTextBasedChannel;
+
+      // 🚫 SPAM detectado
+      if (levelUpStatus.wasSpam) {
+        console.log('🚫 Mensaje detectado como spam');
+        // Aviso en el mismo canal donde mandó el mensaje
+        await (message.channel as GuildTextBasedChannel).send(
+          `⚠️ <@${message.author.id}>, tu mensaje fue detectado como spam y se te restaron **25 XP**. Evitá mensajes sin sentido como teclas al azar.`,
+        );
+        return;
+      }
 
       if (levelUpStatus.canLevelUp) {
         console.log('🎉 Puede subir de nivel!');
@@ -53,11 +57,10 @@ const event: BotEvent = {
         console.log('📈 XP sumado pero no sube de nivel todavía');
       }
 
-      // Consultamos el top 3 DESPUÉS de sumar XP
+      // Top 3 después
       const topDespues = await cacheService.getMembersRankingTopTen(message.guild!.id);
       const top3Despues = topDespues?.slice(0, 3).map((m) => m.discordMemeberId) ?? [];
 
-      // Comparamos si hubo cambios en el top 3
       const huboCambios = top3Despues.some((id, index) => id !== top3Antes[index]);
 
       if (huboCambios && top3Despues.length >= 1) {
@@ -68,7 +71,6 @@ const event: BotEvent = {
           `🏆 **¡Hubo cambios en el Top 3!**\n${lines}`,
         );
       }
-
     } else {
       console.log('❌ addXpMessage devolvió undefined');
     }
