@@ -67,7 +67,15 @@ function generateReactionKey(reaction: MessageReaction, userId: string): string 
 }
 
 // 🚫 Detecta texto sin vocales (asdbaks, qwerty, hjkl, etc)
+function tieneURL(content: string): boolean {
+  // Detecta links: http://, https://, www., o algo.com/.org/.net/.io/etc
+  return /(https?:\/\/|www\.|[\w-]+\.(com|org|net|io|xyz|gg|app|dev|tv|me|co|ar|gob|info|edu))/i.test(content);
+}
+
 function esSpamSinVocales(content: string): boolean {
+  // Si el mensaje contiene un link, no aplicamos detección de spam (los links están permitidos)
+  if (tieneURL(content)) return false;
+
   // Limpiamos: solo letras, sin números, espacios ni símbolos
   const soloLetras = content.toLowerCase().replace(/[^a-záéíóúñ]/g, '');
 
@@ -78,7 +86,7 @@ function esSpamSinVocales(content: string): boolean {
   const vocales = soloLetras.match(/[aeiouáéíóú]/g)?.length ?? 0;
   const ratioVocales = vocales / soloLetras.length;
 
-  // Si tiene menos del 15% de vocales, es spam
+  // Si tiene menos del 25% de vocales, es spam
   return ratioVocales < 0.25;
 }
 
