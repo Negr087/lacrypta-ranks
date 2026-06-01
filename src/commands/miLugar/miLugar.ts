@@ -1,4 +1,4 @@
-import { CommandInteraction, SlashCommandBuilder } from 'discord.js';
+import { CommandInteraction, SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { Command } from '../../types/command';
 import { prisma } from '../../services/prismaClient';
 import { sumXpLevel } from '../../services/temporalLevel';
@@ -17,8 +17,10 @@ const command: Command = {
     .setDescription('Muestra tu posicion en el ranking quincenal'),
   execute: async (interaction: CommandInteraction) => {
     try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
       if (!interaction.guild) {
-        await interaction.reply({ content: 'Este comando solo funciona en servidores.', ephemeral: true });
+        await interaction.editReply({ content: 'Este comando solo funciona en servidores.' });
         return;
       }
 
@@ -26,7 +28,7 @@ const command: Command = {
         where: { discordGuildId: interaction.guild.id },
       });
       if (!guild) {
-        await interaction.reply({ content: 'No se encontro el servidor en la base de datos.', ephemeral: true });
+        await interaction.editReply({ content: 'No se encontro el servidor en la base de datos.' });
         return;
       }
 
@@ -41,9 +43,8 @@ const command: Command = {
       const posicion = todos.findIndex((m) => m.discordMemeberId === interaction.user.id);
 
       if (posicion === -1) {
-        await interaction.reply({
+        await interaction.editReply({
           content: 'Todavia no estas en el ranking. Empeza a participar para sumar XP!',
-          ephemeral: true,
         });
         return;
       }
@@ -54,13 +55,9 @@ const command: Command = {
         ? siguienteNivelXp - miMember.discordTemporalLevelXp
         : null;
 
-      // Diferencia con quien esta arriba (siempre en XP, no importa el nivel)
       let mensajeArriba = '';
       if (posicion > 0) {
         const arriba = todos[posicion - 1]!;
-
-        // Calculamos XP TOTAL acumulado de cada uno
-        // = XP de todos los niveles completados + XP actual en el nivel
         const miXpTotal = sumXpLevel(miMember.discordTemporalLevel) + miMember.discordTemporalLevelXp;
         const xpTotalArriba = sumXpLevel(arriba.discordTemporalLevel) + arriba.discordTemporalLevelXp;
         const diff = xpTotalArriba - miXpTotal;
@@ -89,13 +86,19 @@ const command: Command = {
 
       mensaje += mensajeArriba;
 
-      await interaction.reply({ content: mensaje, ephemeral: true });
+      await interaction.editReply({ content: mensaje });
     } catch (error) {
       console.error('Error en /milugar:', error);
-      await interaction.reply({
-        content: 'Hubo un error al ejecutar el comando.',
-        ephemeral: true,
-      });
+      // Atrapamos también el error del reply para evitar que mate el proceso
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ content: 'Hubo un error al ejecutar el comando.' });
+        } else {
+          await interaction.reply({ content: 'Hubo un error al ejecutar el comando.', flags: MessageFlags.Ephemeral });
+        }
+      } catch (replyError) {
+        console.error('Error al responder con el error:', replyError);
+      }
     }
   },
 };
