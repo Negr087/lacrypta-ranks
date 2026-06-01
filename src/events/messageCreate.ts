@@ -38,16 +38,6 @@ const event: BotEvent = {
           levelsChannelId || message.channel.id,
         ) as GuildTextBasedChannel;
 
-      // 🚫 SPAM detectado
-      if (levelUpStatus.wasSpam) {
-        console.log('🚫 Mensaje detectado como spam');
-        // Aviso en el mismo canal donde mandó el mensaje
-        await (message.channel as GuildTextBasedChannel).send(
-          `⚠️ <@${message.author.id}>, tu mensaje fue detectado como spam y se te restaron **25 XP**. Evitá mensajes sin sentido como teclas al azar.`,
-        );
-        return;
-      }
-
       if (levelUpStatus.canLevelUp) {
         console.log('🎉 Puede subir de nivel!');
         await discordChannel.send(
