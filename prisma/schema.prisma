@@ -117,6 +117,7 @@ model Member {
 
   guild          Guild    @relation(fields: [guildId], references: [id])
   padrinoProfile Padrino? @relation(fields: [myPadrinoId], references: [id])
+  xpLogs         XpLog[]
 
   @@index([discordTemporalLevel(sort: Desc), discordTemporalLevelXp(sort: Desc)])
   @@map("member")
@@ -131,4 +132,17 @@ model Padrino {
   Member Member[]
 
   @@map("padrino")
+}
+
+model XpLog {
+  id               String   @id @default(uuid())
+  memberId         String   @map("member_id")
+  discordChannelId String   @map("discord_channel_id")
+  xpGained         Int      @map("xp_gained")
+  timestamp        DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@index([memberId, timestamp])
+  @@map("xp_log")
 }
