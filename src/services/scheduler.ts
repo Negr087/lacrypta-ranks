@@ -23,6 +23,18 @@ function getProximoCierre(): number {
   return cierre;
 }
 
+export function getInicioCicloActual(): number {
+  const ahora = Date.now();
+  if (ahora < PRIMER_CIERRE_UTC) {
+    return PRIMER_CIERRE_UTC - DOS_SEMANAS_MS;
+  }
+  let cierre = PRIMER_CIERRE_UTC;
+  while (cierre + DOS_SEMANAS_MS <= ahora) {
+    cierre += DOS_SEMANAS_MS;
+  }
+  return cierre;
+}
+
 function getCicloActual(): number {
   const ahora = Date.now();
   if (ahora < PRIMER_CIERRE_UTC) return 0;
