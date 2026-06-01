@@ -1,6 +1,7 @@
 import { Member as PrismaMember } from '@prisma/client';
 import { Guild, GuildMember, Message, MessageReaction, User } from 'discord.js';
 import { cacheService } from './cache';
+import { prisma } from './prismaClient';
 
 const COLDOWN_MS = 90 * 1000;
 
@@ -45,6 +46,7 @@ export interface LevelUpStatus {
   canLevelUp: boolean;
   level: number;
   xpRemaining: number;
+  xpGained?: number;
 }
 
 // Exportamos las constantes para que el comando /xpinfo las pueda leer
@@ -86,6 +88,7 @@ function amountXpToAddMessage(_message: Message, _prismaMember: PrismaMember) {
   const amountXpToAdd = Math.floor(xpType * Math.min(1, deltaTime / COLDOWN_MS) + xpType * lengthMultiplier);
 
   const levelUpStatus: LevelUpStatus = canLevelUp(_prismaMember, amountXpToAdd);
+  levelUpStatus.xpGained = amountXpToAdd;
 
   return levelUpStatus;
 }
@@ -152,6 +155,22 @@ async function addXpMessage(_message: Message) {
     }
 
     const levelUpStatus: LevelUpStatus = amountXpToAddMessage(_message, member);
+
+    // Registrar XP ganado en el historial
+    if (levelUpStatus.xpGained && levelUpStatus.xpGained > 0) {
+      try {
+        await prisma.xpLog.create({
+          data: {
+            memberId: member.id,
+            discordChannelId: _message.channel.id,
+            xpGained: levelUpStatus.xpGained,
+            timestamp: new Date(_message.createdTimestamp),
+          },
+        });
+      } catch (error) {
+        console.error('Error registrando XpLog:', error);
+      }
+    }
 
     if (levelUpStatus.canLevelUp) {
       await cacheService.levelUpMember(
