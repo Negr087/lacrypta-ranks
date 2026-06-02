@@ -57,9 +57,25 @@ const event: BotEvent = {
         console.log('🏆 Cambio en el top 3!');
         const medals = ['🥇', '🥈', '🥉'];
         const lines = top3Despues.map((id, i) => `${medals[i]} <@${id}>`).join('\n');
-        await discordChannel.send(
-          `🏆 **¡Hubo cambios en el Top 3!**\n${lines}`,
-        );
+
+        // Detectar a quien destruyo el autor del mensaje
+        const autorId = message.author.id;
+        const posDespues = top3Despues.indexOf(autorId);
+        let destruidoId: string | null = null;
+
+        if (posDespues !== -1 && posDespues < top3Antes.length) {
+          const candidato = top3Antes[posDespues];
+          if (candidato && candidato !== autorId) {
+            destruidoId = candidato;
+          }
+        }
+
+        let mensajeTop = `🏆 **¡Hubo cambios en el Top 3!**\n${lines}`;
+        if (destruidoId) {
+          mensajeTop += `\n\n💥 <@${destruidoId}> ¡fuiste destruido!`;
+        }
+
+        await discordChannel.send(mensajeTop);
       }
     } else {
       console.log('❌ addXpMessage devolvió undefined');
