@@ -280,4 +280,61 @@ function sumXpLevel(n: number): number {
   return levels[n.toString()]! + sumXpLevel(n - 1);
 }
 
-export { addXpMessage, addXpReaction, sumXpLevel };
+async function addXpDirect(
+  _discordGuildId: string,
+  _discordMemberId: string,
+  _xpAmount: number,
+  _channelId: string,
+  _timestamp: number,
+): Promise<LevelUpStatus | null> {
+  try {
+    const member: PrismaMember | null = await cacheService.getMemberByDiscordId(
+      _discordGuildId,
+      _discordMemberId,
+    );
+
+    if (!member) {
+      console.log(`⚡ Miembro ${_discordMemberId} no encontrado, no se puede dar XP directo`);
+      return null;
+    }
+
+    const levelUpStatus: LevelUpStatus = canLevelUp(member, _xpAmount);
+    levelUpStatus.xpGained = _xpAmount;
+
+    // Registrar en log
+    try {
+      await prisma.xpLog.create({
+        data: {
+          memberId: member.id,
+          discordChannelId: _channelId,
+          xpGained: _xpAmount,
+          timestamp: new Date(_timestamp),
+        },
+      });
+    } catch (error) {
+      console.error('Error registrando XpLog (directo):', error);
+    }
+
+    if (levelUpStatus.canLevelUp) {
+      await cacheService.levelUpMember(
+        member,
+        levelUpStatus.xpRemaining,
+        levelUpStatus.level,
+        _timestamp.toString(),
+      );
+    } else {
+      await cacheService.incrementMemberXp(
+        member,
+        levelUpStatus.xpRemaining,
+        _timestamp.toString(),
+      );
+    }
+
+    return levelUpStatus;
+  } catch (error) {
+    console.error('Failed to add direct xp:', error);
+    return null;
+  }
+}
+
+export { addXpMessage, addXpReaction, addXpDirect, sumXpLevel };
