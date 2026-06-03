@@ -6,7 +6,7 @@ import {
   Role as PrismaRole,
 } from '@prisma/client';
 import { reactionToMessage, selectMenu } from '../commands/roleReaction/roleReaction';
-import { addXpReaction } from '../services/temporalLevel';
+import { addXpReaction, addXpDirect } from '../services/temporalLevel';
 import { cacheService } from '../services/cache';
 import { MessageIndex } from '../types/cache';
 import { prisma } from '../services/prismaClient';
@@ -27,6 +27,52 @@ const event: BotEvent = {
     console.log(
       `[messageReactionAdd.ts] <@${discordMember.id}> reacted with ${reaction.emoji.name} to message ${reaction.message.id}`,
     );
+
+    ////////////////////////////////////////////
+    //               ZAP (⚡)                  //
+    ////////////////////////////////////////////
+    if (reaction.emoji.name === '⚡') {
+      const messageAuthorId = reaction.message.author?.id;
+      if (messageAuthorId && messageAuthorId !== discordMember.id && reaction.message.guild && !discordMember.user.bot) {
+        console.log(`⚡ Zap por reacción: ${discordMember.id} → ${messageAuthorId}`);
+
+        const senderStatus = await addXpDirect(
+          reaction.message.guild.id,
+          discordMember.id,
+          200,
+          reaction.message.channel.id,
+          Date.now(),
+        );
+        const receiverStatus = await addXpDirect(
+          reaction.message.guild.id,
+          messageAuthorId,
+          100,
+          reaction.message.channel.id,
+          Date.now(),
+        );
+
+        const levelsChannelId = await prisma.guild
+          .findUnique({ where: { discordGuildId: reaction.message.guild.id } })
+          .then((g) => g?.levelsChannelId);
+        const canalNotif = reaction.message.guild.channels.cache.get(
+          levelsChannelId || reaction.message.channel.id,
+        ) as GuildTextBasedChannel | undefined;
+
+        if (canalNotif) {
+          if (senderStatus?.canLevelUp) {
+            await canalNotif.send(
+              `⚡ Felicitaciones <@${discordMember.id}>! subiste al nivel ${senderStatus.level} por enviar un zap!`,
+            );
+          }
+          if (receiverStatus?.canLevelUp) {
+            await canalNotif.send(
+              `⚡ Felicitaciones <@${messageAuthorId}>! subiste al nivel ${receiverStatus.level} por recibir un zap!`,
+            );
+          }
+        }
+        return; // No procesar el flujo normal de reacciones
+      }
+    }
 
     ////////////////////////////////////////////
     //            Temporal Level              //
