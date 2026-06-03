@@ -1,6 +1,6 @@
 import { GuildTextBasedChannel, Message } from 'discord.js';
 import { BotEvent } from '../types/botEvents';
-import { LevelUpStatus, addXpMessage } from '../services/temporalLevel';
+import { LevelUpStatus, addXpMessage, addXpDirect } from '../services/temporalLevel';
 import { prisma } from '../services/prismaClient';
 import { cacheService } from '../services/cache';
 
@@ -11,6 +11,49 @@ const event: BotEvent = {
     console.log('📩 messageCreate triggered');
 
     if (message.author.bot) {
+      // Detectar mensajes de zap (formato: "@sender sent X satoshis to @receiver")
+      const zapMatch = message.content.match(/<@!?(\d+)>\s+sent\s+\d+\s+satoshis?\s+to\s+<@!?(\d+)>/i);
+      if (zapMatch && message.guild) {
+        const senderId = zapMatch[1]!;
+        const receiverId = zapMatch[2]!;
+        console.log(`⚡ Zap detectado por mensaje: ${senderId} → ${receiverId}`);
+
+        const senderStatus = await addXpDirect(
+          message.guild.id,
+          senderId,
+          200,
+          message.channel.id,
+          message.createdTimestamp,
+        );
+        const receiverStatus = await addXpDirect(
+          message.guild.id,
+          receiverId,
+          100,
+          message.channel.id,
+          message.createdTimestamp,
+        );
+
+        // Notificar level ups
+        const levelsChannelId = await prisma.guild
+          .findUnique({ where: { discordGuildId: message.guild.id } })
+          .then((g) => g?.levelsChannelId);
+        const canalNotif = message.guild.channels.cache.get(
+          levelsChannelId || message.channel.id,
+        ) as GuildTextBasedChannel | undefined;
+
+        if (canalNotif) {
+          if (senderStatus?.canLevelUp) {
+            await canalNotif.send(
+              `⚡ Felicitaciones <@${senderId}>! subiste al nivel ${senderStatus.level} por enviar un zap!`,
+            );
+          }
+          if (receiverStatus?.canLevelUp) {
+            await canalNotif.send(
+              `⚡ Felicitaciones <@${receiverId}>! subiste al nivel ${receiverStatus.level} por recibir un zap!`,
+            );
+          }
+        }
+      }
       console.log('🤖 Mensaje ignorado (es un bot)');
       return;
     }
