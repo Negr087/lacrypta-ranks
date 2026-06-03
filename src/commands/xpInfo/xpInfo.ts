@@ -16,22 +16,35 @@ const command: Command = {
         .setDescription('Asi funciona el calculo de experiencia:')
         .addFields(
           {
-            name: 'XP por mensaje',
+            name: '💬 XP por mensaje',
             value:
               `Base: **${xpConfig.XP_MESSAGE} XP**\n` +
-              `Multiplicado por el tiempo desde tu ultimo mensaje (cooldown de **${cooldownSeg}s**)\n` +
-              `Mas un bonus aleatorio segun la longitud del mensaje`,
+              `Multiplicado por el tiempo desde tu ultimo mensaje (cooldown de **${cooldownSeg}s**).\n` +
+              `Si esperas el cooldown completo entre mensajes sumas mas XP.\n` +
+              `Mas un bonus aleatorio adicional (0 a 100 XP).\n` +
+              `**Total posible por mensaje: 0 a 200 XP**`,
           },
           {
-            name: 'XP por recibir reaccion',
+            name: '⚡ XP por enviar un zap',
+            value:
+              `**${200} XP** fijos por cada zap que envies.\n` +
+              `Aplica tanto al usar el comando /zap como al reaccionar con ⚡`,
+          },
+          {
+            name: '⚡ XP por recibir un zap',
+            value:
+              `**${100} XP** fijos cuando alguien te zapea.`,
+          },
+          {
+            name: '❤️ XP por recibir reaccion',
             value: `**${xpConfig.XP_REACTION_RECEIVE} XP** por cada reaccion recibida en tus mensajes`,
           },
           {
-            name: 'XP por dar reaccion',
+            name: '👍 XP por dar reaccion',
             value: `**${xpConfig.XP_REACTION_SEND} XP** por reaccionar a mensajes de otros (con cooldown)`,
           },
           {
-            name: 'XP necesario por nivel',
+            name: '📊 XP necesario por nivel',
             value:
               `Nivel 1: ${xpConfig.levels['1']} XP\n` +
               `Nivel 2: ${xpConfig.levels['2']} XP\n` +
@@ -40,8 +53,8 @@ const command: Command = {
               `Nivel 22 (maximo): ${xpConfig.levels['22']} XP`,
           },
           {
-            name: 'Premios quincenales',
-            value: '1ro: 5000 sats\n2do: 3000 sats\n3ro: 1500 sats',
+            name: '🏆 Premios quincenales',
+            value: '🥇 5000 sats\n🥈 3000 sats\n🥉 1500 sats',
           },
         )
         .setFooter({ text: 'Cada 2 semanas se reinicia el ranking y se reparten premios' });
