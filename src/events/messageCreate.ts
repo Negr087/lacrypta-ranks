@@ -49,11 +49,15 @@ const event: BotEvent = {
 
       // Top 3 después
       const topDespues = await cacheService.getMembersRankingTopTen(message.guild!.id);
-      const top3Despues = topDespues?.slice(0, 3).map((m) => m.discordMemeberId) ?? [];
+      const top3DespuesFull = topDespues?.slice(0, 3) ?? [];
+      const top3Despues = top3DespuesFull.map((m) => m.discordMemeberId);
 
       const huboCambios = top3Despues.some((id, index) => id !== top3Antes[index]);
 
-      if (huboCambios && top3Despues.length >= 1) {
+      // Solo notificar si el primero del top 3 ya esta en nivel 5 o mas
+      const primeroEnNivel5 = top3DespuesFull[0] && top3DespuesFull[0].discordTemporalLevel >= 5;
+
+      if (huboCambios && top3Despues.length >= 1 && primeroEnNivel5) {
         console.log('🏆 Cambio en el top 3!');
         const medals = ['🥇', '🥈', '🥉'];
         const lines = top3Despues.map((id, i) => `${medals[i]} <@${id}>`).join('\n');
