@@ -24,16 +24,18 @@ const command: Command = {
               `Mas un bonus aleatorio adicional (0 a 100 XP).\n` +
               `**Total posible por mensaje: 0 a 200 XP**`,
           },
-          {
+         {
             name: '⚡ XP por enviar un zap',
             value:
-              `**${200} XP** fijos por cada zap que envies.\n` +
-              `Aplica tanto al usar el comando /zap como al reaccionar con ⚡`,
+              `Sumas **la mitad** de los sats enviados en XP.\n` +
+              `Ejemplo: si envias 100 sats → sumas 50 XP.\n` +
+              `Aplica al usar el comando /zap o al reaccionar con ⚡`,
           },
           {
             name: '⚡ XP por recibir un zap',
             value:
-              `**${100} XP** fijos cuando alguien te zapea.`,
+              `Sumas **la misma cantidad** de sats recibidos en XP.\n` +
+              `Ejemplo: si te envian 100 sats → sumas 100 XP.`,
           },
           {
             name: '❤️ XP por recibir reaccion',
