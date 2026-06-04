@@ -1,6 +1,7 @@
 import { Client, GuildTextBasedChannel } from 'discord.js';
 import { prisma } from './prismaClient';
 import { cacheService } from './cache';
+import { checkJuradosExpirados } from './juryService';
 
 // 🎯 CONFIGURACIÓN DEL CICLO
 // Primera fecha de cierre: Lunes 1 de Junio 2026 a las 17:00 hora Argentina (UTC-3)
@@ -145,6 +146,8 @@ export function iniciarScheduler(client: Client) {
       const ahora = Date.now();
       const proximoCierre = getProximoCierre();
       const ciclo = getCicloActual();
+      // Chequear jurados expirados
+      await checkJuradosExpirados(client);
 
       // Si cambió el ciclo, reseteamos las flags
       if (ciclo !== cicloActual) {
