@@ -3,6 +3,7 @@ import { BotEvent } from '../types/botEvents';
 import { LevelUpStatus, addXpMessage, addXpDirect } from '../services/temporalLevel';
 import { prisma } from '../services/prismaClient';
 import { cacheService } from '../services/cache';
+import { getInicioCicloActual } from '../services/scheduler';
 
 const event: BotEvent = {
   name: 'messageCreate',
@@ -18,44 +19,87 @@ const event: BotEvent = {
         const sats = parseInt(zapMatch[2]!, 10);
         const receiverId = zapMatch[3]!;
 
-        const xpSender = Math.floor(sats / 2);
-        const xpReceiver = sats;
+        // Contar zaps previos entre estos dos usuarios en el ciclo actual
+        const inicioCiclo = new Date(getInicioCicloActual());
+        const sender = await cacheService.getMemberByDiscordId(message.guild.id, senderId);
+        const receiver = await cacheService.getMemberByDiscordId(message.guild.id, receiverId);
 
-        console.log(`⚡ Zap detectado: ${senderId} envió ${sats} sats a ${receiverId} (XP: +${xpSender} / +${xpReceiver})`);
+        if (sender && receiver) {
+          const zapsExistentes = await prisma.xpLog.count({
+            where: {
+              OR: [
+                { memberId: sender.id, zapPairUserId: receiverId },
+                { memberId: receiver.id, zapPairUserId: senderId },
+              ],
+              timestamp: { gte: inicioCiclo },
+            },
+          });
+          // Cada zap genera 2 logs (uno para sender, uno para receiver), por eso dividimos
+          const zapsPrevios = Math.floor(zapsExistentes / 2);
 
-        const senderStatus = await addXpDirect(
-          message.guild.id,
-          senderId,
-          xpSender,
-          message.channel.id,
-          message.createdTimestamp,
-        );
-        const receiverStatus = await addXpDirect(
-          message.guild.id,
-          receiverId,
-          xpReceiver,
-          message.channel.id,
-          message.createdTimestamp,
-        );
+          let multiplier = 1;
+          let multiplierLabel = '100%';
+          if (zapsPrevios === 1) { multiplier = 0.5; multiplierLabel = '50%'; }
+          else if (zapsPrevios === 2) { multiplier = 0.25; multiplierLabel = '25%'; }
+          else if (zapsPrevios >= 3) { multiplier = 0; multiplierLabel = '0%'; }
 
-        // Notificar level ups
-        const levelsChannelId = await prisma.guild
-          .findUnique({ where: { discordGuildId: message.guild.id } })
-          .then((g) => g?.levelsChannelId);
-        const canalNotif = message.guild.channels.cache.get(
-          levelsChannelId || message.channel.id,
-        ) as GuildTextBasedChannel | undefined;
+          const xpSender = Math.floor((sats / 2) * multiplier);
+          const xpReceiver = Math.floor(sats * multiplier);
 
-        if (canalNotif) {
-          if (senderStatus?.canLevelUp) {
-            await canalNotif.send(
-              `⚡ Felicitaciones <@${senderId}>! subiste al nivel ${senderStatus.level} por enviar un zap!`,
+          console.log(
+            `⚡ Zap: ${senderId} -> ${receiverId} (${sats} sats, ${zapsPrevios + 1}° zap entre ellos, ${multiplierLabel} XP: +${xpSender} / +${xpReceiver})`,
+          );
+
+          const levelsChannelId = await prisma.guild
+            .findUnique({ where: { discordGuildId: message.guild.id } })
+            .then((g) => g?.levelsChannelId);
+          const canalNotif = message.guild.channels.cache.get(
+            levelsChannelId || message.channel.id,
+          ) as GuildTextBasedChannel | undefined;
+
+          if (multiplier > 0) {
+            const senderStatus = await addXpDirect(
+              message.guild.id,
+              senderId,
+              xpSender,
+              message.channel.id,
+              message.createdTimestamp,
+              receiverId,
             );
-          }
-          if (receiverStatus?.canLevelUp) {
-            await canalNotif.send(
-              `⚡ Felicitaciones <@${receiverId}>! subiste al nivel ${receiverStatus.level} por recibir un zap!`,
+            const receiverStatus = await addXpDirect(
+              message.guild.id,
+              receiverId,
+              xpReceiver,
+              message.channel.id,
+              message.createdTimestamp,
+              senderId,
             );
+
+            if (canalNotif) {
+              // Si es el 2do o 3er zap, avisar que el XP fue reducido
+              if (zapsPrevios > 0) {
+                await canalNotif.send(
+                  `⚡ Zap registrado entre <@${senderId}> y <@${receiverId}> — XP reducido al ${multiplierLabel} (${zapsPrevios + 1}° zap entre ellos en el ciclo).`,
+                );
+              }
+              if (senderStatus?.canLevelUp) {
+                await canalNotif.send(
+                  `⚡ Felicitaciones <@${senderId}>! subiste al nivel ${senderStatus.level} por enviar un zap!`,
+                );
+              }
+              if (receiverStatus?.canLevelUp) {
+                await canalNotif.send(
+                  `⚡ Felicitaciones <@${receiverId}>! subiste al nivel ${receiverStatus.level} por recibir un zap!`,
+                );
+              }
+            }
+          } else {
+            // 4to zap o más → no suma XP
+            if (canalNotif) {
+              await canalNotif.send(
+                `⚡ Zap entre <@${senderId}> y <@${receiverId}> registrado pero no suma XP (ya alcanzaron el límite de zaps entre ustedes en este ciclo).`,
+              );
+            }
           }
         }
       }
