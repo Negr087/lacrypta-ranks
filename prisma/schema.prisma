@@ -140,9 +140,11 @@ model XpLog {
   discordChannelId String   @map("discord_channel_id")
   xpGained         Int      @map("xp_gained")
   timestamp        DateTime @default(now())
+  zapPairUserId    String?  @map("zap_pair_user_id")
 
   member Member @relation(fields: [memberId], references: [id])
 
   @@index([memberId, timestamp])
+  @@index([zapPairUserId, timestamp])
   @@map("xp_log")
 }
