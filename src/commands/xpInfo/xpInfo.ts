@@ -28,14 +28,22 @@ const command: Command = {
             name: '⚡ XP por enviar un zap',
             value:
               `Sumas **la mitad** de los sats enviados en XP.\n` +
-              `Ejemplo: si envias 100 sats → sumas 50 XP.\n` +
-              `Aplica al usar el comando /zap o al reaccionar con ⚡`,
+              `Ejemplo: si envias 100 sats → sumas 50 XP.`,
           },
           {
             name: '⚡ XP por recibir un zap',
             value:
               `Sumas **la misma cantidad** de sats recibidos en XP.\n` +
               `Ejemplo: si te envian 100 sats → sumas 100 XP.`,
+          },
+          {
+            name: '🛡️ Anti-abuso de zaps',
+            value:
+              `El XP por zaps entre el mismo par de usuarios se reduce con cada repeticion en el ciclo:\n` +
+              `• 1er zap: **100%** del XP\n` +
+              `• 2do zap: **50%**\n` +
+              `• 3er zap: **25%**\n` +
+              `• 4to en adelante: **0%** (no suma)`,
           },
           {
             name: '❤️ XP por recibir reaccion',
