@@ -127,6 +127,10 @@ export async function cerrarVotacion(client: Client, juryId: string): Promise<vo
     },
   });
 
+  // 🏆 Top 3 ANTES de aplicar penalización
+  const topAntes = await cacheService.getMembersRankingTopTen(jury.guildId);
+  const top3Antes = topAntes?.slice(0, 3).map((m) => m.discordMemeberId) ?? [];
+
   // Aplicar penalización si fue aprobada
   let penalizacionInfo: Awaited<ReturnType<typeof aplicarPenalizacion>> = null;
   if (aprobado && jury.penaltyPercent > 0) {
@@ -167,6 +171,39 @@ export async function cerrarVotacion(client: Client, juryId: string): Promise<vo
       }
     } catch (error) {
       console.error('Error actualizando mensaje del jurado:', error);
+    }
+  }
+
+  // 🏆 Si se aplicó penalización, chequear cambios en el top 3
+  if (aprobado && penalizacionInfo) {
+    try {
+      const topDespues = await cacheService.getMembersRankingTopTen(jury.guildId);
+      const top3DespuesFull = topDespues?.slice(0, 3) ?? [];
+      const top3Despues = top3DespuesFull.map((m) => m.discordMemeberId);
+
+      const huboCambios = top3Despues.some((id, index) => id !== top3Antes[index]);
+      const primeroEnNivel5 = top3DespuesFull[0] && top3DespuesFull[0].discordTemporalLevel >= 5;
+
+      if (huboCambios && top3Despues.length >= 1 && primeroEnNivel5) {
+        // Buscar el canal de levels
+        const guildDB = await prisma.guild.findUnique({
+          where: { discordGuildId: jury.guildId },
+        });
+        const guild = client.guilds.cache.get(jury.guildId);
+        const canalNotif = guild?.channels.cache.get(
+          guildDB?.levelsChannelId || jury.discordChannelId || '',
+        ) as GuildTextBasedChannel | undefined;
+
+        if (canalNotif) {
+          const medals = ['🥇', '🥈', '🥉'];
+          const lines = top3Despues.map((id, i) => `${medals[i]} <@${id}>`).join('\n');
+          await canalNotif.send(
+            `🏆 **¡Cambios en el Top 3 tras el veredicto del jurado!**\n${lines}\n\n⚖️ <@${jury.accusedId}> perdió posiciones por la penalización.`,
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error chequeando cambios en top 3 post-jurado:', error);
     }
   }
 }
