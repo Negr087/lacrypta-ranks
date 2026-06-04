@@ -286,8 +286,14 @@ async function addXpDirect(
   _xpAmount: number,
   _channelId: string,
   _timestamp: number,
+  _zapPairUserId?: string,
 ): Promise<LevelUpStatus | null> {
   try {
+    if (_xpAmount <= 0) {
+      console.log(`⚡ XP amount es 0 o negativo, no se hace nada`);
+      return null;
+    }
+
     const member: PrismaMember | null = await cacheService.getMemberByDiscordId(
       _discordGuildId,
       _discordMemberId,
@@ -309,6 +315,7 @@ async function addXpDirect(
           discordChannelId: _channelId,
           xpGained: _xpAmount,
           timestamp: new Date(_timestamp),
+          zapPairUserId: _zapPairUserId ?? null,
         },
       });
     } catch (error) {
