@@ -20,9 +20,9 @@ const event: BotEvent = {
     /// Slash Command ///
     /////////////////////
     if (interaction.isChatInputCommand()) {
-      const command = client.commands.get(interaction.commandName); // Get command from collection
-      if (!command) return; // If command doesn't exist, return
-      command.execute(interaction); // If command exist, execute it
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
+      command.execute(interaction);
     }
 
     //////////////
@@ -78,7 +78,9 @@ const event: BotEvent = {
             }
           }
         }
-        /// /jurado - voto a favor ///
+      } /// End Of /role-button ///
+
+      /// /jurado - voto a favor ///
       if (interaction.customId.startsWith('jury_vote_for_')) {
         const juryId = interaction.customId.replace('jury_vote_for_', '');
         await procesarVoto(interaction, juryId, 'for');
@@ -112,7 +114,6 @@ const event: BotEvent = {
         await interaction.deferUpdate();
         await cerrarVotacion(interaction.client, juryId);
       }
-      } /// End Of /role-button ///
 
       /// /ser-padrino ///
       if (interaction.customId === 'ser-padrino-edit-button') {
@@ -149,99 +150,4 @@ const event: BotEvent = {
       } /// End Of /role-rection-commnad ///
 
       /// /obtener-padrino ///
-      if (interaction.customId === 'obtener-padrino-select-menu') {
-        // Get selected padrino
-        const selectedPadrinoMemberId: string = interaction.values[0]!;
-
-        await createSelectPadrino(interaction, selectedPadrinoMemberId);
-      } /// End Of /obtener-padrino ///
-    }
-
-    ////////////////////
-    /// Modal Submit ///
-    ////////////////////
-    else if (interaction.isModalSubmit()) {
-      /// /role-button-commnad ///
-      if (interaction.customId === 'role-button-modal') {
-        // Setup
-        if (interaction.fields.fields.firstKey() === 'role-button-text-input-message') {
-          // Get channel
-          const channelId: string = interaction.channelId!;
-          const channel: GuildBasedChannel | undefined = interaction.guild!.channels.cache.get(channelId);
-          const textInputMessage: string = interaction.fields.fields.first()!.value!;
-
-          // Send message
-          if (channel?.type === ChannelType.GuildText) {
-            try {
-              await interaction.deferUpdate(); // Acknowledge the interaction
-            } catch (error) {
-              console.error('Failed defer modal message', error);
-            }
-
-            const discordMessageInstance: Message = await channel!.send(textInputMessage);
-
-            await addButtonToMessage(discordMessageInstance.id);
-          }
-        }
-      } /// End Of /role-button ///
-
-      /// /ser-padrino ///
-      if (interaction.customId === 'ser-padrino-modal') {
-        await createAndSendMessagePadrinoProfile(interaction);
-      } /// End Of /ser-padrino ///
-    }
-
-    /////////////////////////////////////
-    /// Interaction is not implemented //
-    //////////////////////////////////////
-    else {
-      console.log('Interaction is not implemented.');
-    }
-  },
-};
-
-async function procesarVoto(
-  interaction: import('discord.js').ButtonInteraction,
-  juryId: string,
-  vote: 'for' | 'against',
-) {
-  try {
-    const jury = await prisma.jury.findUnique({ where: { id: juryId } });
-    if (!jury) {
-      await interaction.reply({ content: 'Votación no encontrada.', ephemeral: true });
-      return;
-    }
-    if (jury.status !== 'active') {
-      await interaction.reply({ content: 'La votación ya está cerrada.', ephemeral: true });
-      return;
-    }
-    if (jury.accusedId === interaction.user.id) {
-      await interaction.reply({ content: 'No podés votar en una votación que es contra vos.', ephemeral: true });
-      return;
-    }
-
-    // Upsert: crear o actualizar voto
-    await prisma.juryVote.upsert({
-      where: { juryId_voterId: { juryId, voterId: interaction.user.id } },
-      update: { vote },
-      create: { juryId, voterId: interaction.user.id, vote },
-    });
-
-    // Actualizar el embed del mensaje
-    const embed = await generarEmbedJurado(juryId);
-    if (embed) {
-      await interaction.update({ embeds: [embed] });
-    } else {
-      await interaction.deferUpdate();
-    }
-  } catch (error) {
-    console.error('Error procesando voto:', error);
-    try {
-      await interaction.reply({ content: 'Hubo un error al votar.', ephemeral: true });
-    } catch (e) {
-      // ignore
-    }
-  }
-}
-
-export default event;
+      if (interaction.customId === 'obt
