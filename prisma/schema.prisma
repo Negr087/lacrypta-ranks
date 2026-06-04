@@ -148,3 +148,38 @@ model XpLog {
   @@index([zapPairUserId, timestamp])
   @@map("xp_log")
 }
+
+model Jury {
+  id               String    @id @default(uuid())
+  guildId          String    @map("guild_id")
+  initiatorId      String    @map("initiator_id")
+  accusedId        String    @map("accused_id")
+  penaltyPercent   Int       @map("penalty_percent")
+  reason           String?
+  status           String    @default("active")
+  result           String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  closedAt         DateTime? @map("closed_at")
+  expiresAt        DateTime  @map("expires_at")
+  discordMessageId String?   @map("discord_message_id")
+  discordChannelId String?   @map("discord_channel_id")
+
+  votes JuryVote[]
+
+  @@index([status, expiresAt])
+  @@index([accusedId, status])
+  @@map("jury")
+}
+
+model JuryVote {
+  id        String   @id @default(uuid())
+  juryId    String   @map("jury_id")
+  voterId   String   @map("voter_id")
+  vote      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  jury Jury @relation(fields: [juryId], references: [id])
+
+  @@unique([juryId, voterId])
+  @@map("jury_vote")
+}
