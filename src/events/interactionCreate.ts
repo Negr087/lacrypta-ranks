@@ -8,6 +8,7 @@ import { addButtonToMessage } from '../commands/roleButton/roleButton';
 import { createAndSendMessagePadrinoProfile, modalMenu } from '../commands/padrino/serPadrinoHelpers';
 import { createSelectPadrino } from '../commands/padrino/obtenerPadrinoHelpers';
 import { cacheService } from '../services/cache';
+import { cerrarVotacion, generarEmbedJurado } from '../services/juryService';
 
 const event: BotEvent = {
   name: 'interactionCreate',
@@ -77,6 +78,40 @@ const event: BotEvent = {
             }
           }
         }
+        /// /jurado - voto a favor ///
+      if (interaction.customId.startsWith('jury_vote_for_')) {
+        const juryId = interaction.customId.replace('jury_vote_for_', '');
+        await procesarVoto(interaction, juryId, 'for');
+      }
+
+      /// /jurado - voto en contra ///
+      if (interaction.customId.startsWith('jury_vote_against_')) {
+        const juryId = interaction.customId.replace('jury_vote_against_', '');
+        await procesarVoto(interaction, juryId, 'against');
+      }
+
+      /// /jurado - cerrar ///
+      if (interaction.customId.startsWith('jury_close_')) {
+        const juryId = interaction.customId.replace('jury_close_', '');
+        const jury = await prisma.jury.findUnique({ where: { id: juryId } });
+        if (!jury) {
+          await interaction.reply({ content: 'Votación no encontrada.', ephemeral: true });
+          return;
+        }
+        if (jury.initiatorId !== interaction.user.id) {
+          await interaction.reply({
+            content: 'Solo quien inició la votación puede cerrarla.',
+            ephemeral: true,
+          });
+          return;
+        }
+        if (jury.status !== 'active') {
+          await interaction.reply({ content: 'La votación ya está cerrada.', ephemeral: true });
+          return;
+        }
+        await interaction.deferUpdate();
+        await cerrarVotacion(interaction.client, juryId);
+      }
       } /// End Of /role-button ///
 
       /// /ser-padrino ///
@@ -164,5 +199,49 @@ const event: BotEvent = {
     }
   },
 };
+
+async function procesarVoto(
+  interaction: import('discord.js').ButtonInteraction,
+  juryId: string,
+  vote: 'for' | 'against',
+) {
+  try {
+    const jury = await prisma.jury.findUnique({ where: { id: juryId } });
+    if (!jury) {
+      await interaction.reply({ content: 'Votación no encontrada.', ephemeral: true });
+      return;
+    }
+    if (jury.status !== 'active') {
+      await interaction.reply({ content: 'La votación ya está cerrada.', ephemeral: true });
+      return;
+    }
+    if (jury.accusedId === interaction.user.id) {
+      await interaction.reply({ content: 'No podés votar en una votación que es contra vos.', ephemeral: true });
+      return;
+    }
+
+    // Upsert: crear o actualizar voto
+    await prisma.juryVote.upsert({
+      where: { juryId_voterId: { juryId, voterId: interaction.user.id } },
+      update: { vote },
+      create: { juryId, voterId: interaction.user.id, vote },
+    });
+
+    // Actualizar el embed del mensaje
+    const embed = await generarEmbedJurado(juryId);
+    if (embed) {
+      await interaction.update({ embeds: [embed] });
+    } else {
+      await interaction.deferUpdate();
+    }
+  } catch (error) {
+    console.error('Error procesando voto:', error);
+    try {
+      await interaction.reply({ content: 'Hubo un error al votar.', ephemeral: true });
+    } catch (e) {
+      // ignore
+    }
+  }
+}
 
 export default event;
