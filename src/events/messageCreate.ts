@@ -12,23 +12,28 @@ const event: BotEvent = {
 
     if (message.author.bot) {
       // Detectar mensajes de zap (formato: "@sender sent X satoshis to @receiver")
-      const zapMatch = message.content.match(/<@!?(\d+)>\s+sent\s+\d+\s+satoshis?\s+to\s+<@!?(\d+)>/i);
+      const zapMatch = message.content.match(/<@!?(\d+)>\s+sent\s+(\d+)\s+satoshis?\s+to\s+<@!?(\d+)>/i);
       if (zapMatch && message.guild) {
         const senderId = zapMatch[1]!;
-        const receiverId = zapMatch[2]!;
-        console.log(`⚡ Zap detectado por mensaje: ${senderId} → ${receiverId}`);
+        const sats = parseInt(zapMatch[2]!, 10);
+        const receiverId = zapMatch[3]!;
+
+        const xpSender = Math.floor(sats / 2);
+        const xpReceiver = sats;
+
+        console.log(`⚡ Zap detectado: ${senderId} envió ${sats} sats a ${receiverId} (XP: +${xpSender} / +${xpReceiver})`);
 
         const senderStatus = await addXpDirect(
           message.guild.id,
           senderId,
-          200,
+          xpSender,
           message.channel.id,
           message.createdTimestamp,
         );
         const receiverStatus = await addXpDirect(
           message.guild.id,
           receiverId,
-          100,
+          xpReceiver,
           message.channel.id,
           message.createdTimestamp,
         );
