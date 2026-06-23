@@ -8,7 +8,7 @@ import { addButtonToMessage } from '../commands/roleButton/roleButton';
 import { createAndSendMessagePadrinoProfile, modalMenu } from '../commands/padrino/serPadrinoHelpers';
 import { createSelectPadrino } from '../commands/padrino/obtenerPadrinoHelpers';
 import { cacheService } from '../services/cache';
-import { cerrarVotacion, generarEmbedJurado } from '../services/juryService';
+import { generarEmbedJurado } from '../services/juryService';
 
 const event: BotEvent = {
   name: 'interactionCreate',
@@ -90,29 +90,6 @@ const event: BotEvent = {
       if (interaction.customId.startsWith('jury_vote_against_')) {
         const juryId = interaction.customId.replace('jury_vote_against_', '');
         await procesarVoto(interaction, juryId, 'against');
-      }
-
-      /// /jurado - cerrar ///
-      if (interaction.customId.startsWith('jury_close_')) {
-        const juryId = interaction.customId.replace('jury_close_', '');
-        const jury = await prisma.jury.findUnique({ where: { id: juryId } });
-        if (!jury) {
-          await interaction.reply({ content: 'Votación no encontrada.', ephemeral: true });
-          return;
-        }
-        if (jury.initiatorId !== interaction.user.id) {
-          await interaction.reply({
-            content: 'Solo quien inició la votación puede cerrarla.',
-            ephemeral: true,
-          });
-          return;
-        }
-        if (jury.status !== 'active') {
-          await interaction.reply({ content: 'La votación ya está cerrada.', ephemeral: true });
-          return;
-        }
-        await interaction.deferUpdate();
-        await cerrarVotacion(interaction.client, juryId);
       }
 
       /// /ser-padrino ///
