@@ -13,7 +13,6 @@ import { prisma } from '../../services/prismaClient';
 import {
   generarEmbedJurado,
   getDuracionVotacionMs,
-  cerrarVotacion,
 } from '../../services/juryService';
 
 const command: Command = {
@@ -44,10 +43,6 @@ const command: Command = {
           opt.setName('motivo').setDescription('Motivo de la acusacion').setRequired(false),
         ),
     )
-    .addSubcommand((sub) =>
-      sub
-        .setName('cerrar')
-        .setDescription('Cerrar la votación que iniciaste antes de que termine'),
     ) as SlashCommandBuilder,
 
   execute: async (interaction: CommandInteraction) => {
@@ -113,10 +108,6 @@ const command: Command = {
             .setCustomId(`jury_vote_against_${jury.id}`)
             .setLabel('👎 En contra')
             .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId(`jury_close_${jury.id}`)
-            .setLabel('🔒 Cerrar (iniciador)')
-            .setStyle(ButtonStyle.Secondary),
         );
 
         const embed = await generarEmbedJurado(jury.id);
@@ -132,32 +123,7 @@ const command: Command = {
           where: { id: jury.id },
           data: { discordMessageId: reply.id },
         });
-      } else if (sub === 'cerrar') {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-        if (!interaction.guild) {
-          await interaction.editReply({ content: 'Este comando solo funciona en servidores.' });
-          return;
-        }
-
-        // Buscar la última votación activa que inició este usuario
-        const jury = await prisma.jury.findFirst({
-          where: {
-            initiatorId: interaction.user.id,
-            status: 'active',
-            guildId: interaction.guild.id,
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-
-        if (!jury) {
-          await interaction.editReply({ content: 'No tenés ninguna votación activa para cerrar.' });
-          return;
-        }
-
-        await cerrarVotacion(interaction.client, jury.id);
-        await interaction.editReply({ content: 'Votación cerrada.' });
-      }
+      
     } catch (error) {
       console.error('Error en /jurado:', error);
       try {
