@@ -3,7 +3,8 @@ import { prisma } from './prismaClient';
 import { cacheService } from './cache';
 import { xpConfig } from './temporalLevel';
 
-const DURACION_VOTACION_MS = 12 * 60 * 60 * 1000; // 12 horas
+const DURACION_VOTACION_MS = 24 * 60 * 60 * 1000; // 24 horas
+const MIN_VOTOS_REQUERIDOS = 5;
 
 export function calcularNivelYxp(xpTotal: number): { nivel: number; xpEnNivel: number } {
   let nivel = 0;
@@ -76,6 +77,8 @@ export async function generarEmbedJurado(juryId: string): Promise<EmbedBuilder |
   const horas = Math.max(0, Math.floor(tiempoRestante / (1000 * 60 * 60)));
   const minutos = Math.max(0, Math.floor((tiempoRestante % (1000 * 60 * 60)) / (1000 * 60)));
   const tiempoStr = jury.status === 'active' ? `${horas}h ${minutos}m restantes` : 'CERRADA';
+  const totalVotos = jury.votes.length;
+  const votosFaltantes = Math.max(0, MIN_VOTOS_REQUERIDOS - totalVotos);
 
   let color = 0x3498db;
   if (jury.status !== 'active') {
@@ -90,13 +93,16 @@ export async function generarEmbedJurado(juryId: string): Promise<EmbedBuilder |
         `**Iniciado por:** <@${jury.initiatorId}>\n` +
         `**Penalización propuesta:** ${jury.penaltyPercent === 0 ? 'Sin penalización' : `Restar **${jury.penaltyPercent}%** del XP total`}\n` +
         (jury.reason ? `**Motivo:** ${jury.reason}\n` : '') +
-        `\n📊 **Votación:**\n👍 A favor: **${votosFavor}**\n👎 En contra: **${votosContra}**\n\n⏰ ${tiempoStr}`,
+        `\n📊 **Votación:**\n👍 A favor: **${votosFavor}**\n👎 En contra: **${votosContra}**\n` +
+        `🗳️ Quorum: **${totalVotos}/${MIN_VOTOS_REQUERIDOS}** votos${votosFaltantes > 0 && jury.status === 'active' ? ` (faltan ${votosFaltantes})` : ''}\n` +
+        `\n⏰ ${tiempoStr}`,
     );
 
   if (jury.status !== 'active') {
     let resultadoStr = '';
     if (jury.result === 'approved') resultadoStr = '✅ **CONDENADO** — Penalización aplicada';
     else if (jury.result === 'rejected') resultadoStr = '❌ Rechazada — No hubo mayoría a favor';
+    else if (jury.result === 'no_quorum') resultadoStr = '⚪ **INOCENTE** — No se alcanzaron los 5 votos necesarios';
     else resultadoStr = '⚪ Sin resolución';
     embed.addFields({ name: 'Resultado', value: resultadoStr });
   }
@@ -113,8 +119,43 @@ export async function cerrarVotacion(client: Client, juryId: string): Promise<vo
 
   const votosFavor = jury.votes.filter((v) => v.vote === 'for').length;
   const votosContra = jury.votes.filter((v) => v.vote === 'against').length;
+  const totalVotos = jury.votes.length;
 
-  // Mayoría simple: más a favor que en contra
+  // Si no llegó al mínimo de votos: descartar sin penalizar
+  if (totalVotos < MIN_VOTOS_REQUERIDOS) {
+    await prisma.jury.update({
+      where: { id: juryId },
+      data: {
+        status: 'closed',
+        closedAt: new Date(),
+        result: 'no_quorum',
+      },
+    });
+
+    if (jury.discordChannelId && jury.discordMessageId) {
+      try {
+        const guild = client.guilds.cache.get(jury.guildId);
+        const canal = guild?.channels.cache.get(jury.discordChannelId) as GuildTextBasedChannel | undefined;
+        if (canal) {
+          const msg = await canal.messages.fetch(jury.discordMessageId).catch(() => null);
+          if (msg) {
+            const embed = await generarEmbedJurado(juryId);
+            if (embed) {
+              await msg.edit({ embeds: [embed], components: [] });
+            }
+          }
+          await canal.send(
+            `⚖️ **Veredicto:** <@${jury.accusedId}> sale **INOCENTE**.\nLa votación no alcanzó el mínimo de ${MIN_VOTOS_REQUERIDOS} votos (solo hubo ${totalVotos}).`,
+          );
+        }
+      } catch (error) {
+        console.error('Error actualizando mensaje del jurado (sin quorum):', error);
+      }
+    }
+    return;
+  }
+
+  // Hay quorum: mayoría simple
   const aprobado = votosFavor > votosContra;
   const result = aprobado ? 'approved' : 'rejected';
 
@@ -151,7 +192,6 @@ export async function cerrarVotacion(client: Client, juryId: string): Promise<vo
           }
         }
 
-        // Anuncio del resultado
         if (aprobado && penalizacionInfo) {
           await canal.send(
             `⚖️ **Veredicto:** <@${jury.accusedId}> fue **CONDENADO** por la votación.\n` +
@@ -185,7 +225,6 @@ export async function cerrarVotacion(client: Client, juryId: string): Promise<vo
       const primeroEnNivel5 = top3DespuesFull[0] && top3DespuesFull[0].discordTemporalLevel >= 5;
 
       if (huboCambios && top3Despues.length >= 1 && primeroEnNivel5) {
-        // Buscar el canal de levels
         const guildDB = await prisma.guild.findUnique({
           where: { discordGuildId: jury.guildId },
         });
