@@ -66,6 +66,15 @@ const command: Command = {
             name: '🏆 Premios quincenales',
             value: '🥇 5000 sats\n🥈 3000 sats\n🥉 1500 sats',
           },
+          {
+            name: '⚖️ Sistema de jurado',
+            value:
+              `Cualquier usuario puede iniciar una votación con \`/jurado iniciar\`.\n` +
+              `• Dura **24 horas** fijas (no se puede cerrar antes).\n` +
+              `• Necesita mínimo **5 votos** para tener efecto.\n` +
+              `• Si no llega a 5 votos: el acusado sale **INOCENTE**.\n` +
+              `• Si gana 'a favor' con quórum: se aplica la penalización elegida.`,
+          },
         )
         .setFooter({ text: 'Cada 2 semanas se reinicia el ranking y se reparten premios' });
 
