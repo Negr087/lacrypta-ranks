@@ -5,7 +5,6 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  GuildTextBasedChannel,
   MessageFlags,
 } from 'discord.js';
 import { Command } from '../../types/command';
@@ -122,7 +121,7 @@ const command: Command = {
           where: { id: jury.id },
           data: { discordMessageId: reply.id },
         });
-      
+      }
     } catch (error) {
       console.error('Error en /jurado:', error);
       try {
