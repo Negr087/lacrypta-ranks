@@ -42,7 +42,6 @@ const command: Command = {
         .addStringOption((opt) =>
           opt.setName('motivo').setDescription('Motivo de la acusacion').setRequired(false),
         ),
-    )
     ) as SlashCommandBuilder,
 
   execute: async (interaction: CommandInteraction) => {
