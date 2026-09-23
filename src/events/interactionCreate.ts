@@ -104,15 +104,39 @@ const event: BotEvent = {
         });
       } /// End Of /ser-padrino ///
 
-      /// /obtener-padrino ///
+            /// /obtener-padrino ///
       if (interaction.customId.startsWith('obtener-padrino-confirm-button-id:')) {
         const prismaPadrinoId: string = interaction.customId.split(':')[1]!;
+
+        // Doble-check al momento de confirmar (por si alguien más lo eligió mientras tanto)
+        const invocante = await cacheService.getMemberByDiscordId(interaction.guildId!, interaction.user.id);
+        if (invocante?.myPadrinoId) {
+          await interaction.update({
+            content: '❌ Ya tenés un padrino asignado. No podés cambiarlo libremente.',
+            components: [],
+            embeds: [],
+          });
+          return;
+        }
+
+        const ahijadosDelPadrino = await prisma.member.count({
+          where: { myPadrinoId: prismaPadrinoId },
+        });
+        if (ahijadosDelPadrino >= 1) {
+          await interaction.update({
+            content: '❌ Este padrino ya tiene un ahijado. Volvé a usar /obtener-padrino para ver los disponibles.',
+            components: [],
+            embeds: [],
+          });
+          return;
+        }
 
         await cacheService.updatePadrinoOfMember(interaction.user.id, prismaPadrinoId);
 
         await interaction.update({
           content: '# Padrino confirmado! :white_check_mark:',
           components: [],
+          embeds: [],
         });
       } /// End Of /obtener-padrino ///
     }
