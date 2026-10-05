@@ -79,7 +79,7 @@ const event: BotEvent = {
               // Si es el 2do o 3er zap, avisar que el XP fue reducido
               if (zapsPrevios > 0) {
                 await canalNotif.send(
-                  `⚡ Zap registrado entre <@${senderId}> y <@${receiverId}> — XP reducido al ${multiplierLabel} (${zapsPrevios + 1}° zap entre ellos en el ciclo).`,
+                  `⚡ Ya hubo ${zapsPrevios === 1 ? 'un zap' : `${zapsPrevios} zaps`} entre <@${senderId}> y <@${receiverId}> en este ciclo (en cualquier dirección), por eso el XP se reduce al ${multiplierLabel}.`,
                 );
               }
               if (senderStatus?.canLevelUp) {
