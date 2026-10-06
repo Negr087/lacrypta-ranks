@@ -183,3 +183,32 @@ model JuryVote {
   @@unique([juryId, voterId])
   @@map("jury_vote")
 }
+
+model RankingCycle {
+  id          String   @id @default(uuid())
+  guildId     String   @map("guild_id")
+  cycleNumber Int      @map("cycle_number")
+  startedAt   DateTime @map("started_at")
+  closedAt    DateTime @map("closed_at")
+
+  entries RankingCycleEntry[]
+
+  @@unique([guildId, cycleNumber])
+  @@map("ranking_cycle")
+}
+
+model RankingCycleEntry {
+  id            String @id @default(uuid())
+  cycleId       String @map("cycle_id")
+  position      Int
+  discordUserId String @map("discord_user_id")
+  displayName   String @map("display_name")
+  level         Int
+  xp            Int
+  prizeSats     Int    @default(0) @map("prize_sats")
+
+  cycle RankingCycle @relation(fields: [cycleId], references: [id])
+
+  @@index([discordUserId])
+  @@map("ranking_cycle_entry")
+}
