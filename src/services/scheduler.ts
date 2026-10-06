@@ -36,6 +36,42 @@ export function getInicioCicloActual(): number {
   return cierre;
 }
 
+async function guardarSnapshotCiclo(
+  discordGuildId: string,
+  top: { discordMemeberId: string; discordDisplayName: string; discordTemporalLevel: number; discordTemporalLevelXp: number }[],
+) {
+  try {
+    const cycleNumber = getCicloActual();
+    const closedAt = new Date(PRIMER_CIERRE_UTC + (cycleNumber - 1) * DOS_SEMANAS_MS);
+    const startedAt = new Date(closedAt.getTime() - DOS_SEMANAS_MS);
+    const premios = [5000, 3000, 1500];
+
+    const ciclo = await prisma.rankingCycle.upsert({
+      where: { guildId_cycleNumber: { guildId: discordGuildId, cycleNumber } },
+      update: {},
+      create: { guildId: discordGuildId, cycleNumber, startedAt, closedAt },
+    });
+
+    // Si ya había una foto de este ciclo (por un reinicio del bot), la reemplazamos
+    await prisma.rankingCycleEntry.deleteMany({ where: { cycleId: ciclo.id } });
+    await prisma.rankingCycleEntry.createMany({
+      data: top.map((m, i) => ({
+        cycleId: ciclo.id,
+        position: i + 1,
+        discordUserId: m.discordMemeberId,
+        displayName: m.discordDisplayName,
+        level: m.discordTemporalLevel,
+        xp: m.discordTemporalLevelXp,
+        prizeSats: premios[i] ?? 0,
+      })),
+    });
+
+    console.log(`📸 Snapshot del ciclo ${cycleNumber} guardado (${top.length} posiciones)`);
+  } catch (error) {
+    console.error('Error guardando snapshot del ciclo:', error);
+  }
+}
+
 function getCicloActual(): number {
   const ahora = Date.now();
   if (ahora < PRIMER_CIERRE_UTC) return 0;
@@ -131,6 +167,9 @@ async function ejecutarCierreYReset(client: Client) {
     mensaje += `\n🎉 ¡Felicitaciones a todos! El ranking se reinicia ahora.\nNueva ronda → ¡a participar!`;
 
     await canal.send(mensaje);
+
+    // Guardar la foto del top 10 ANTES de resetear
+    await guardarSnapshotCiclo(guild.discordGuildId, top ?? []);
 
     // Resetear niveles
     await cacheService.resetLevels();
