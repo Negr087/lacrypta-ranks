@@ -163,6 +163,14 @@ model Jury {
   expiresAt        DateTime  @map("expires_at")
   discordMessageId String?   @map("discord_message_id")
   discordChannelId String?   @map("discord_channel_id")
+  stakeSats        Int       @default(0) @map("stake_sats")
+  stakeInvoice     String?   @map("stake_invoice")
+  stakeHash        String?   @map("stake_hash")
+  stakePaidAt      DateTime? @map("stake_paid_at")
+  payoutTo         String?   @map("payout_to")
+  payoutStatus     String    @default("none") @map("payout_status")
+  payoutClaimUntil DateTime? @map("payout_claim_until")
+  payoutPaidAt     DateTime? @map("payout_paid_at")
 
   votes JuryVote[]
 
