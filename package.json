@@ -24,7 +24,9 @@
     "@prisma/client": "5.14.0",
     "@types/fs-extra": "^11.0.4",
     "discord.js": "^14.15.2",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "@getalby/sdk": "3.9.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@lacrypta/eslint-config": "^1.0.0",
@@ -36,6 +38,7 @@
     "nodemon": "^3.1.0",
     "prettier": "^3.2.5",
     "prisma": "^5.14.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@types/ws": "^8.5.12"
   }
 }
