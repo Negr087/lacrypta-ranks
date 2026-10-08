@@ -2,17 +2,18 @@ import {
   CommandInteraction,
   SlashCommandBuilder,
   CommandInteractionOptionResolver,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   MessageFlags,
 } from 'discord.js';
 import { Command } from '../../types/command';
 import { prisma } from '../../services/prismaClient';
 import {
+  activarSiPagado,
   generarEmbedJurado,
-  getDuracionVotacionMs,
+  PAGO_TIMEOUT_MS,
+  PAGO_TIMEOUT_SEG,
+  STAKE_SATS,
 } from '../../services/juryService';
+import { crearFactura, nwcConfigurado } from '../../services/nwcService';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -73,7 +74,11 @@ const command: Command = {
 
         // Verificar que no haya otra votación activa contra el mismo usuario
         const activa = await prisma.jury.findFirst({
-          where: { accusedId: acusado.id, status: 'active', guildId: interaction.guild.id },
+          where: {
+            accusedId: acusado.id,
+            status: { in: ['active', 'pending_payment'] },
+            guildId: interaction.guild.id,
+          },
         });
         if (activa) {
           await interaction.editReply({
@@ -82,8 +87,12 @@ const command: Command = {
           return;
         }
 
-        // Crear el jurado
-        const expiresAt = new Date(Date.now() + getDuracionVotacionMs());
+        if (!nwcConfigurado()) {
+          await interaction.editReply({ content: 'La fianza en sats no está configurada. Avisá a un admin.' });
+          return;
+        }
+
+        // Crear el jurado (queda esperando el pago de la fianza)
         const jury = await prisma.jury.create({
           data: {
             guildId: interaction.guild.id,
@@ -91,22 +100,24 @@ const command: Command = {
             accusedId: acusado.id,
             penaltyPercent: penalizacion,
             reason: motivo,
-            expiresAt,
+            status: 'pending_payment',
+            stakeSats: STAKE_SATS,
+            expiresAt: new Date(Date.now() + PAGO_TIMEOUT_MS), // límite para pagar; al pagar se reinicia a 24h
             discordChannelId: interaction.channelId,
           },
         });
 
-        // Crear botones
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`jury_vote_for_${jury.id}`)
-            .setLabel('👍 A favor')
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId(`jury_vote_against_${jury.id}`)
-            .setLabel('👎 En contra')
-            .setStyle(ButtonStyle.Danger),
-        );
+        let invoice: string;
+        try {
+          const f = await crearFactura(STAKE_SATS, `Fianza jurado La Crypta ${jury.id.slice(0, 8)}`, PAGO_TIMEOUT_SEG);
+          invoice = f.invoice;
+          await prisma.jury.update({ where: { id: jury.id }, data: { stakeInvoice: f.invoice, stakeHash: f.paymentHash } });
+        } catch (error) {
+          console.error('Error creando factura de fianza:', error);
+          await prisma.jury.delete({ where: { id: jury.id } });
+          await interaction.editReply({ content: 'No pude generar la factura de la fianza. Probá de nuevo en un rato.' });
+          return;
+        }
 
         const embed = await generarEmbedJurado(jury.id);
         if (!embed) {
@@ -114,13 +125,29 @@ const command: Command = {
           return;
         }
 
-        const reply = await interaction.editReply({ embeds: [embed], components: [row] });
+        const reply = await interaction.editReply({ embeds: [embed], components: [] });
+        await prisma.jury.update({ where: { id: jury.id }, data: { discordMessageId: reply.id } });
 
-        // Guardar el ID del mensaje
-        await prisma.jury.update({
-          where: { id: jury.id },
-          data: { discordMessageId: reply.id },
+        // La factura la ve solo quien acusa
+        await interaction.followUp({
+          content:
+            `⚡ Para iniciar el juicio pagá la fianza de **${STAKE_SATS} sats** con cualquier wallet Lightning ` +
+            `(tenés ${PAGO_TIMEOUT_SEG / 60} minutos). Si pasa el juicio sin condena o sin veredicto, podés reclamarla de vuelta.\n` +
+            `\`\`\`${invoice}\`\`\``,
+          flags: MessageFlags.Ephemeral,
         });
+
+        // Chequeo rápido del pago (si el bot se reinicia, lo retoma el scheduler)
+        const hasta = Date.now() + PAGO_TIMEOUT_MS;
+        const timer = setInterval(async () => {
+          try {
+            await activarSiPagado(interaction.client, jury.id);
+            const j = await prisma.jury.findUnique({ where: { id: jury.id }, select: { status: true } });
+            if (!j || j.status !== 'pending_payment' || Date.now() > hasta + 60_000) clearInterval(timer);
+          } catch (e) {
+            console.error('Error en chequeo de pago:', e);
+          }
+        }, 5000);
       }
     } catch (error) {
       console.error('Error en /jurado:', error);
