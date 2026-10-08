@@ -1,4 +1,14 @@
-import { ChannelType, GuildBasedChannel, Interaction, Message, Role } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ChannelType,
+  GuildBasedChannel,
+  Interaction,
+  Message,
+  ModalBuilder,
+  Role,
+  TextInputBuilder,
+  TextInputStyle,
+} from 'discord.js';
 import { BotEvent } from '../types/botEvents';
 import { ExtendedClient } from '../types/discordClient';
 import { prisma } from '../services/prismaClient';
@@ -8,7 +18,7 @@ import { addButtonToMessage } from '../commands/roleButton/roleButton';
 import { createAndSendMessagePadrinoProfile, modalMenu } from '../commands/padrino/serPadrinoHelpers';
 import { createSelectPadrino } from '../commands/padrino/obtenerPadrinoHelpers';
 import { cacheService } from '../services/cache';
-import { generarEmbedJurado } from '../services/juryService';
+import { generarEmbedJurado, reclamarPago, STAKE_SATS } from '../services/juryService';
 
 const event: BotEvent = {
   name: 'interactionCreate',
@@ -90,6 +100,38 @@ const event: BotEvent = {
       if (interaction.customId.startsWith('jury_vote_against_')) {
         const juryId = interaction.customId.replace('jury_vote_against_', '');
         await procesarVoto(interaction, juryId, 'against');
+      }
+
+      /// /jurado - reclamar sats ///
+      if (interaction.customId.startsWith('jury_claim_')) {
+        const juryId = interaction.customId.replace('jury_claim_', '');
+        const jury = await prisma.jury.findUnique({ where: { id: juryId } });
+        const destinatario = jury?.payoutTo === 'accused' ? jury.accusedId : jury?.initiatorId;
+        if (!jury || !jury.payoutTo || interaction.user.id !== destinatario) {
+          await interaction.reply({ content: 'Este pago no es para vos.', ephemeral: true });
+          return;
+        }
+        if (jury.payoutStatus !== 'claimable') {
+          await interaction.reply({
+            content:
+              jury.payoutStatus === 'claimed'
+                ? '✅ Ya reclamaste estos sats.'
+                : jury.payoutStatus === 'expired'
+                  ? '⌛ Venció el plazo de 7 días. Hablá con un admin.'
+                  : '⏳ Tu pago está en proceso.',
+            ephemeral: true,
+          });
+          return;
+        }
+        const modal = new ModalBuilder().setCustomId(`jury_claim_modal_${juryId}`).setTitle(`Reclamar ${STAKE_SATS} sats`);
+        const input = new TextInputBuilder()
+          .setCustomId('destino')
+          .setLabel(`Lightning address o factura de ${STAKE_SATS} sats`)
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+          .setMaxLength(1500);
+        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+        await interaction.showModal(modal);
       }
 
       /// /ser-padrino ///
@@ -182,6 +224,19 @@ const event: BotEvent = {
           }
         }
       } /// End Of /role-button ///
+
+      /// /jurado - reclamar sats ///
+      if (interaction.customId.startsWith('jury_claim_modal_')) {
+        const juryId = interaction.customId.replace('jury_claim_modal_', '');
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const msg = await reclamarPago(juryId, interaction.user.id, interaction.fields.getTextInputValue('destino'));
+          await interaction.editReply({ content: msg });
+        } catch (error) {
+          console.error('Error reclamando pago de jurado:', error);
+          await interaction.editReply({ content: 'Hubo un error. Avisá a un admin antes de reintentar.' });
+        }
+      }
 
       /// /ser-padrino ///
       if (interaction.customId === 'ser-padrino-modal') {
