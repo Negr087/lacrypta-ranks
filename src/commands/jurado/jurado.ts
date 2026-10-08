@@ -1,4 +1,6 @@
+import QRCode from 'qrcode';
 import {
+  AttachmentBuilder,
   CommandInteraction,
   SlashCommandBuilder,
   CommandInteractionOptionResolver,
@@ -128,12 +130,15 @@ const command: Command = {
         const reply = await interaction.editReply({ embeds: [embed], components: [] });
         await prisma.jury.update({ where: { id: jury.id }, data: { discordMessageId: reply.id } });
 
-        // La factura la ve solo quien acusa
+        // La factura (y el QR) la ve solo quien acusa
+        const qr = await QRCode.toBuffer(`lightning:${invoice}`.toUpperCase(), { width: 480, margin: 2 });
         await interaction.followUp({
           content:
-            `⚡ Para iniciar el juicio pagá la fianza de **${STAKE_SATS} sats** con cualquier wallet Lightning ` +
-            `(tenés ${PAGO_TIMEOUT_SEG / 60} minutos). Si pasa el juicio sin condena o sin veredicto, podés reclamarla de vuelta.\n` +
-            `\`\`\`${invoice}\`\`\``,
+            `⚡ Para iniciar el juicio pagá la fianza de **${STAKE_SATS} sats** escaneando el QR o copiando la factura ` +
+            `(tenés ${PAGO_TIMEOUT_SEG / 60} minutos). Si el acusado es culpable o no hay veredicto, podés reclamarla de vuelta.\n` +
+            `\`\`\`${invoice}\`\`\`\n` +
+            `💡 También podés pagar esta factura usando el bot **LN ZAP BOT** con el comando \`/pay\`.`,
+          files: [new AttachmentBuilder(qr, { name: 'fianza.png' })],
           flags: MessageFlags.Ephemeral,
         });
 
