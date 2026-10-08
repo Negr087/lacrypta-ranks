@@ -70,10 +70,13 @@ const command: Command = {
             name: '⚖️ Sistema de jurado',
             value:
               `Cualquier usuario puede iniciar una votación con \`/jurado iniciar\`.\n` +
-              `• Dura **24 horas** fijas (no se puede cerrar antes).\n` +
+              `• Quien acusa paga una **fianza de 2100 sats** (factura Lightning con QR). Sin pago en 10 minutos, el juicio se cancela.\n` +
+              `• La votación dura **24 horas** fijas (no se puede cerrar antes).\n` +
               `• Necesita mínimo **5 votos** para tener efecto.\n` +
-              `• Si no llega a 5 votos: el acusado sale **INOCENTE**.\n` +
-              `• Si gana 'a favor' con quórum: se aplica la penalización elegida.`,
+              `• Si gana 'a favor' con quórum: el acusado es **CULPABLE**, se aplica la penalización elegida y el acusador recupera su fianza.\n` +
+              `• Si gana 'en contra': el acusado es **INOCENTE** y se lleva los 2100 sats del acusador.\n` +
+              `• Si no llega a 5 votos: el acusado sale **INOCENTE** pero no cobra; se devuelve la fianza al acusador.\n` +
+              `• Quien corresponda cobra con el botón **⚡ Reclamar** (Lightning address o factura de 2100 sats) dentro de **7 días**.`,
           },
         )
         .setFooter({ text: 'Cada 2 semanas se reinicia el ranking y se reparten premios' });
